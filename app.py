@@ -467,6 +467,18 @@ def _game_sokoban():
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     background: transparent;
   }}
+  #sk-game-wrap {{
+    transform-origin: top center;
+    width: fit-content;
+    margin: 0 auto;
+  }}
+  /* 窄屏整体等比例缩放，保持电脑端完全一致的地图和控件布局 */
+  @media (max-width: 420px) {{
+    #sk-game-wrap {{ transform: scale(0.62); }}
+  }}
+  @media (max-width: 360px) {{
+    #sk-game-wrap {{ transform: scale(0.52); }}
+  }}
   #sk-info {{
     display: flex;
     justify-content: space-between;
@@ -542,45 +554,27 @@ def _game_sokoban():
     font-size: 18px;
     min-height: 24px;
   }}
-  /* 响应式：窄屏（手机）自动缩小 - 保持 1px 缝隙让地图连贯 */
-  @media (max-width: 420px) {{
-    body {{ padding: 4px; }}
-    #sk-info {{ font-size: 13px; }}
-    #sk-grid {{
-      grid-template-columns: repeat({map_cols}, 30px);
-      grid-template-rows: repeat({map_rows}, 30px);
-      gap: 1px;
-      padding: 2px;
-      border-radius: 6px;
-    }}
-    .sk-cell {{ width: 30px; height: 30px; font-size: 18px; }}
-    #sk-controls {{
-      grid-template-columns: 48px 48px 48px;
-      grid-template-rows: 48px 48px;
-      gap: 4px;
-      margin: 10px auto 0;
-    }}
-    .sk-btn {{ font-size: 22px; border-radius: 6px; }}
-    #sk-msg {{ font-size: 15px; margin-top: 8px; }}
-  }}
+  /* 响应式：窄屏（手机）不做任何改动，靠外层 #sk-game-wrap 整体等比例缩放 */
 </style>
 </head>
 <body>
-<div id="sk-info">
-  <span>🎯 第 {level_idx + 1} 关</span>
-  <span>🚶 移动：<span id="sk-moves">0</span></span>
-  <span>📦 目标：<span id="sk-done">0</span> / {total_boxes}</span>
+<div id="sk-game-wrap">
+  <div id="sk-info">
+    <span>🎯 第 {level_idx + 1} 关</span>
+    <span>🚶 移动：<span id="sk-moves">0</span></span>
+    <span>📦 目标：<span id="sk-done">0</span> / {total_boxes}</span>
+  </div>
+  <div id="sk-grid"></div>
+  <div id="sk-controls">
+    <div></div>
+    <button class="sk-btn" id="btn-up">⬆️</button>
+    <div></div>
+    <button class="sk-btn" id="btn-left">⬅️</button>
+    <button class="sk-btn" id="btn-down">⬇️</button>
+    <button class="sk-btn" id="btn-right">➡️</button>
+  </div>
+  <div id="sk-msg"></div>
 </div>
-<div id="sk-grid"></div>
-<div id="sk-controls">
-  <div></div>
-  <button class="sk-btn" id="btn-up">⬆️</button>
-  <div></div>
-  <button class="sk-btn" id="btn-left">⬅️</button>
-  <button class="sk-btn" id="btn-down">⬇️</button>
-  <button class="sk-btn" id="btn-right">➡️</button>
-</div>
-<div id="sk-msg"></div>
 
 <script>
 (function() {{
