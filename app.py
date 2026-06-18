@@ -250,90 +250,77 @@ def display_card_list():
     st.markdown(f"**共 {len(filtered_birds)} 种鸟类**")
     st.markdown("---")
 
-    # 响应式布局：电脑端用两列，手机端自动堆叠为单列
-    # 通过判断屏幕宽度在 CSS 中隐藏/显示列；这里用单一容器 + 卡片流式排版，确保窄屏顺序为 1,2,3...
-    use_two_cols = True
-    try:
-        # Streamlit 没有直接获取客户端宽度的接口，但可以用 JS 注入检测后存到 session_state
-        # 简化方案：使用 CSS 让两列在窄屏自动堆叠为单列，保证渲染顺序
-        st.markdown("""
-        <style>
-        @media (max-width: 768px) {
-            .bird-card-row { flex-direction: column !important; }
-            .bird-card-row > div { width: 100% !important; }
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    except Exception:
-        pass
-
-    # 使用 1 列垂直流式排版，避免 i%2 在窄屏下出现 1,3,5,7,9 跳序
-    # 电脑端用 CSS 模拟两列
-    cards_html_parts = []
-    for i, bird in enumerate(filtered_birds):
-        img_path = get_local_image_path(bird)
-        img_html = ""
-        if img_path:
-            # 使用 file:// 绝对路径
-            img_html = f'<img src="file:///{img_path.replace(chr(92), "/")}" style="width:100%;border-radius:8px;" />'
-        else:
-            img_html = '<div class="placeholder-img" style="font-size:3rem;text-align:center;">🐦</div>'
-
-        card_html = f"""
-        <div class="bird-card" style="margin-bottom:14px;padding:14px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-            <div class="bird-card-row" style="display:flex;gap:12px;align-items:flex-start;">
-                <div style="flex:1.5;min-width:0;">
-                    <div style="color:#888;font-size:0.85rem;">{bird.get('pinyin', '')}</div>
-                    <div style="font-size:1.15rem;font-weight:700;color:#222;">{bird['id']}. {bird['name']}</div>
-                    <div style="font-style:italic;color:#666;font-size:0.85rem;">{bird['scientific_name']}</div>
-                    <div style="margin-top:6px;">
-                        <span class="info-tag" style="background:#f0f4f8;padding:2px 8px;border-radius:10px;font-size:0.78rem;color:#456;margin-right:4px;">{bird['category']}</span>
-                        <span class="info-tag" style="background:#f0f4f8;padding:2px 8px;border-radius:10px;font-size:0.78rem;color:#456;margin-right:4px;">{bird['season']}</span>
-                        <span class="info-tag" style="background:#f0f4f8;padding:2px 8px;border-radius:10px;font-size:0.78rem;color:#456;">{bird['conservation_level']}</span>
-                    </div>
-                    <div style="color:#FFB300;font-size:1rem;margin-top:4px;">{bird.get('common_level', '')}</div>
-                </div>
-                <div style="flex:1;min-width:0;">{img_html}</div>
-            </div>
-        </div>
-        """
-        cards_html_parts.append(card_html)
-
-    # 电脑端两列布局
-    pc_html = ""
-    for i in range(0, len(cards_html_parts), 2):
-        left = cards_html_parts[i]
-        right = cards_html_parts[i+1] if i+1 < len(cards_html_parts) else '<div></div>'
-        pc_html += f"""
-        <div style="display:flex;gap:14px;margin-bottom:14px;">
-            <div style="flex:1;min-width:0;">{left}</div>
-            <div style="flex:1;min-width:0;">{right}</div>
-        </div>
-        """
-
-    # 注入响应式 CSS
-    st.markdown(f"""
+    # 电脑端 2 列网格，手机端 1 列（CSS grid 避免 div 嵌套错乱）
+    st.markdown("""
     <style>
-    .bird-grid-pc {{ display: block; }}
-    .bird-grid-mobile {{ display: none; }}
-    @media (max-width: 768px) {{
-        .bird-grid-pc {{ display: none; }}
-        .bird-grid-mobile {{ display: block; }}
-    }}
+    .bird-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .bird-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+    .bird-card-info { flex: 1.5; min-width: 0; }
+    .bird-card-img  { flex: 1; min-width: 0; }
+    .bird-card-info .pinyin { color: #888; font-size: 0.85rem; }
+    .bird-card-info .name { font-size: 1.15rem; font-weight: 700; color: #222; }
+    .bird-card-info .sci { font-style: italic; color: #666; font-size: 0.85rem; }
+    .bird-card-info .tags { margin-top: 6px; }
+    .bird-card-info .tag {
+        background: #f0f4f8; padding: 2px 8px; border-radius: 10px;
+        font-size: 0.78rem; color: #456; margin-right: 4px; display: inline-block;
+    }
+    .bird-card-info .star { color: #FFB300; font-size: 1rem; margin-top: 4px; }
+    .bird-card-img img { width: 100%; border-radius: 8px; }
+    .bird-card-img .ph { font-size: 3rem; text-align: center; }
+    @media (max-width: 768px) {
+        .bird-grid { grid-template-columns: 1fr; }
+    }
     </style>
-    <div class="bird-grid-pc">{pc_html}</div>
-    <div class="bird-grid-mobile">{''.join(cards_html_parts)}</div>
     """, unsafe_allow_html=True)
 
-    # 详情按钮（必须用 streamlit widget，放在卡片下方）
-    # 电脑端 2 列，手机端 1 列
-    if use_two_cols:
-        for i, bird in enumerate(filtered_birds):
-            cols_btn = st.columns(2)
-            with cols_btn[i % 2]:
-                if st.button(f"查看详情 · {bird['id']}. {bird['name']}", key=f"btn_{bird['id']}", use_container_width=True):
-                    st.session_state['selected_bird'] = bird
-                    st.rerun()
+    # 构造所有卡片 HTML
+    cards_html = []
+    for bird in filtered_birds:
+        img_path = get_local_image_path(bird)
+        if img_path:
+            img_html = f'<img src="file:///{img_path.replace(chr(92), "/")}" />'
+        else:
+            img_html = '<div class="ph">🐦</div>'
+        cards_html.append(f"""
+        <div class="bird-card">
+            <div class="bird-card-info">
+                <div class="pinyin">{bird.get('pinyin', '')}</div>
+                <div class="name">{bird['id']}. {bird['name']}</div>
+                <div class="sci">{bird['scientific_name']}</div>
+                <div class="tags">
+                    <span class="tag">{bird['category']}</span>
+                    <span class="tag">{bird['season']}</span>
+                    <span class="tag">{bird['conservation_level']}</span>
+                </div>
+                <div class="star">{bird.get('common_level', '')}</div>
+            </div>
+            <div class="bird-card-img">{img_html}</div>
+        </div>
+        """)
+
+    st.markdown(f'<div class="bird-grid">{"".join(cards_html)}</div>', unsafe_allow_html=True)
+
+    # 详情按钮（电脑端 2 列 / 手机端 1 列）
+    detail_cols = st.columns(2)
+    for i, bird in enumerate(filtered_birds):
+        with detail_cols[i % 2]:
+            if st.button(f"查看详情 · {bird['id']}. {bird['name']}", key=f"btn_{bird['id']}", use_container_width=True):
+                st.session_state['selected_bird'] = bird
+                st.rerun()
 
 
 def display_detail_page(bird):
@@ -764,478 +751,314 @@ def _game_sokoban():
 
 
 def display_games_page():
-    """游戏页面"""
+    """游戏页面（已废弃，保留以防兼容 - 现统一在首页用 expander 展示）"""
     import random
 
     st.markdown("## 🕹️ 趣味游戏")
     st.caption("在游戏中认识鸟类 · 边玩边学")
+    st.warning("游戏已迁移到首页底部 · 折叠式展示")
 
-    # 手机端友好的游戏选择：4 个大按钮卡片（电脑端 4 列 / 手机端 2x2）
-    if 'home_game' in st.session_state and st.session_state['home_game']:
-        # 从首页点进来时直接锁定游戏
-        game_key_map = {
-            "qimg": "🎨 看图猜鸟",
-            "qaudio": "🎵 听音识鸟",
-            "qkb": "❓ 知识问答",
-            "qbox": "📦 推箱子·救小鸟",
-        }
-        game = game_key_map.get(st.session_state['home_game'], "🎨 看图猜鸟")
-        st.session_state.pop('home_game', None)
-        st.session_state['sk_current_game'] = game
-    elif 'sk_current_game' not in st.session_state:
-        st.session_state['sk_current_game'] = "🎨 看图猜鸟"
-
-    game = st.session_state['sk_current_game']
-
-    # 顶部游戏切换按钮（4 列，电脑端横排 / 手机端 2x2）
-    games_list = [
-        ("🎨", "看图猜鸟", "qimg"),
-        ("🎵", "听音识鸟", "qaudio"),
-        ("❓", "知识问答", "qkb"),
-        ("📦", "推箱子·救小鸟", "qbox"),
-    ]
-    nav_cols = st.columns(4)
-    for i, (icon, name, key) in enumerate(games_list):
-        with nav_cols[i % 4]:
-            is_active = (game == f"{icon} {name}")
-            bg = "linear-gradient(135deg,#ffb74d,#ff9800)" if is_active else "linear-gradient(135deg,#f5f5f5,#e0e0e0)"
-            color = "#fff" if is_active else "#5d4037"
-            st.markdown(f"""
-            <div style="background:{bg};padding:12px 6px;border-radius:10px;text-align:center;
-                        box-shadow:0 2px 6px rgba(0,0,0,0.08);margin-bottom:6px;color:{color};
-                        font-weight:600;min-height:50px;display:flex;align-items:center;justify-content:center;">
-                <span style="font-size:1.4rem;margin-right:4px;">{icon}</span>{name}
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button(f"切换到{name}", key=f"nav_{key}", use_container_width=True):
-                st.session_state['sk_current_game'] = f"{icon} {name}"
-                st.rerun()
-
-    st.markdown("---")
-    
+    # 兼容老逻辑：仍支持页面内游戏选择
+    game = st.selectbox("选择游戏", [
+        "🎨 看图猜鸟",
+        "🎵 听音识鸟",
+        "❓ 知识问答",
+        "📦 推箱子·救小鸟"
+    ])
     if game == "🎨 看图猜鸟":
-        st.markdown("### 🎨 看图猜鸟")
-        st.write("根据图片猜猜这是什么鸟？")
-        
-        # 只选有实际图片的鸟（保证一定有图）
-        birds_with_img = [b for b in BIRDS_DATA if get_local_image_path(b)]
-        
-        # 初始化/换题
-        if 'qimg_bird' not in st.session_state or st.session_state.get('qimg_new'):
-            quiz_bird = random.choice(birds_with_img)
-            options = [quiz_bird['name']]
-            other_birds = [b for b in birds_with_img if b['id'] != quiz_bird['id']]
-            wrong_options = random.sample(other_birds, min(3, len(other_birds)))
-            options.extend([b['name'] for b in wrong_options])
-            random.shuffle(options)
-            st.session_state['qimg_bird'] = quiz_bird
-            st.session_state['qimg_options'] = options
-            st.session_state['qimg_answered'] = False
-            st.session_state['qimg_user'] = None
-            st.session_state['qimg_score'] = st.session_state.get('qimg_score', 0)
-            st.session_state['qimg_total'] = st.session_state.get('qimg_total', 0)
-            st.session_state['qimg_new'] = False
-        
-        quiz_bird = st.session_state['qimg_bird']
-        options = st.session_state['qimg_options']
-        answered = st.session_state['qimg_answered']
-        user_ans = st.session_state['qimg_user']
-        correct = quiz_bird['name']
-        
-        st.write(f"**得分：{st.session_state['qimg_score']} / {st.session_state['qimg_total']}**")
-        
-        # 已过滤，quiz_bird 一定有图片
-        st.image(get_local_image_path(quiz_bird), width=350)
-        
-        if not answered:
-            # 答题中
-            selected = st.radio("你的答案：", options, index=None, key="qimg_radio")
-            if selected:
-                st.session_state['qimg_answered'] = True
-                st.session_state['qimg_user'] = selected
-                st.session_state['qimg_total'] += 1
-                if selected == correct:
-                    st.session_state['qimg_score'] += 1
-                st.rerun()
+        display_qimg_inline()
+    elif game == "🎵 听音识鸟":
+        display_qaudio_inline()
+    elif game == "❓ 知识问答":
+        display_qkb_inline()
+    elif game == "📦 推箱子·救小鸟":
+        display_qbox_inline()
+
+
+def display_qimg_inline():
+    """看图猜鸟 - 可在 expander 中内联调用"""
+    import random
+    st.markdown("**根据图片猜猜这是什么鸟？**")
+
+    birds_with_img = [b for b in BIRDS_DATA if get_local_image_path(b)]
+    if not birds_with_img:
+        st.warning("暂无可用图片")
+        return
+
+    if 'qimg_bird' not in st.session_state or st.session_state.get('qimg_new'):
+        quiz_bird = random.choice(birds_with_img)
+        options = [quiz_bird['name']]
+        other_birds = [b for b in birds_with_img if b['id'] != quiz_bird['id']]
+        options.extend([b['name'] for b in random.sample(other_birds, min(3, len(other_birds)))])
+        random.shuffle(options)
+        st.session_state['qimg_bird'] = quiz_bird
+        st.session_state['qimg_options'] = options
+        st.session_state['qimg_answered'] = False
+        st.session_state['qimg_user'] = None
+        st.session_state['qimg_score'] = st.session_state.get('qimg_score', 0)
+        st.session_state['qimg_total'] = st.session_state.get('qimg_total', 0)
+        st.session_state['qimg_new'] = False
+
+    quiz_bird = st.session_state['qimg_bird']
+    options = st.session_state['qimg_options']
+    answered = st.session_state['qimg_answered']
+    user_ans = st.session_state['qimg_user']
+    correct = quiz_bird['name']
+
+    st.caption(f"得分：{st.session_state['qimg_score']} / {st.session_state['qimg_total']}")
+    st.image(get_local_image_path(quiz_bird), width=300)
+
+    if not answered:
+        selected = st.radio("你的答案：", options, index=None, key="qimg_radio")
+        if selected:
+            st.session_state['qimg_answered'] = True
+            st.session_state['qimg_user'] = selected
+            st.session_state['qimg_total'] += 1
+            if selected == correct:
+                st.session_state['qimg_score'] += 1
+            st.rerun()
+    else:
+        if user_ans == correct:
+            st.success(f"🎉 正确！这就是 **{correct}**（{quiz_bird.get('pinyin', '')}）")
         else:
-            # 已答：显示对错 + 下一题
-            if user_ans == correct:
-                st.success(f"🎉 回答正确！这就是 **{correct}**（{quiz_bird.get('pinyin', '')}）")
-            else:
-                st.error(f"❌ 回答错误！")
-                st.info(f"你的答案：**{user_ans}**　✅ 正确答案：**{correct}**（{quiz_bird.get('pinyin', '')}）")
-            
-            st.markdown("**📖 鸟种介绍：**")
+            st.error(f"❌ 错误！你的答案：**{user_ans}**　✅ 正确：**{correct}**")
+        with st.expander("📖 鸟种介绍", expanded=True):
             st.write(f"*{quiz_bird['scientific_name']}*　{quiz_bird.get('english_name', '')}")
             st.write(quiz_bird['description'])
-            
-            if st.button("➡️ 下一题", key="qimg_next", use_container_width=True):
-                st.session_state['qimg_new'] = True
-                st.rerun()
-    
-    elif game == "🎵 听音识鸟":
-        st.markdown("### 🎵 听音识鸟")
-        st.write("听音频，猜猜是哪只鸟？")
-        
-        # 只选有实际音频文件的鸟
-        birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b)]
-        
-        if 'qaud_bird' not in st.session_state or st.session_state.get('qaud_new'):
-            quiz_bird = random.choice(birds_with_audio)
-            options = [quiz_bird['name']]
-            other_birds = [b for b in birds_with_audio if b['id'] != quiz_bird['id']]
-            wrong_options = random.sample(other_birds, min(3, len(other_birds)))
-            options.extend([b['name'] for b in wrong_options])
-            random.shuffle(options)
-            st.session_state['qaud_bird'] = quiz_bird
-            st.session_state['qaud_options'] = options
-            st.session_state['qaud_answered'] = False
-            st.session_state['qaud_user'] = None
-            st.session_state['qaud_score'] = st.session_state.get('qaud_score', 0)
-            st.session_state['qaud_total'] = st.session_state.get('qaud_total', 0)
-            st.session_state['qaud_new'] = False
-        
-        quiz_bird = st.session_state['qaud_bird']
-        options = st.session_state['qaud_options']
-        answered = st.session_state['qaud_answered']
-        user_ans = st.session_state['qaud_user']
-        correct = quiz_bird['name']
-        
-        st.write(f"**得分：{st.session_state['qaud_score']} / {st.session_state['qaud_total']}**")
-        
-        # 音频（已过滤过，quiz_bird 一定有音频）
-        audio_path = get_local_audio_path(quiz_bird)
-        st.audio(audio_path)
-        
-        if not answered:
-            selected = st.radio("你的答案：", options, index=None, key="qaud_radio")
-            if selected:
-                st.session_state['qaud_answered'] = True
-                st.session_state['qaud_user'] = selected
-                st.session_state['qaud_total'] += 1
-                if selected == correct:
-                    st.session_state['qaud_score'] += 1
-                st.rerun()
+        if st.button("➡️ 下一题", key="qimg_next", use_container_width=True):
+            st.session_state['qimg_new'] = True
+            st.rerun()
+    if st.button("🔄 重新开始", key="qimg_restart", use_container_width=True):
+        for k in ['qimg_bird','qimg_options','qimg_answered','qimg_user','qimg_score','qimg_total','qimg_new']:
+            st.session_state.pop(k, None)
+        st.rerun()
+
+
+def display_qaudio_inline():
+    """听音识鸟 - 可在 expander 中内联调用"""
+    import random
+    st.markdown("**听音频，猜猜是哪只鸟？**")
+
+    birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b)]
+    if not birds_with_audio:
+        st.warning("暂无可用音频")
+        return
+
+    if 'qaud_bird' not in st.session_state or st.session_state.get('qaud_new'):
+        quiz_bird = random.choice(birds_with_audio)
+        options = [quiz_bird['name']]
+        other_birds = [b for b in birds_with_audio if b['id'] != quiz_bird['id']]
+        options.extend([b['name'] for b in random.sample(other_birds, min(3, len(other_birds)))])
+        random.shuffle(options)
+        st.session_state['qaud_bird'] = quiz_bird
+        st.session_state['qaud_options'] = options
+        st.session_state['qaud_answered'] = False
+        st.session_state['qaud_user'] = None
+        st.session_state['qaud_score'] = st.session_state.get('qaud_score', 0)
+        st.session_state['qaud_total'] = st.session_state.get('qaud_total', 0)
+        st.session_state['qaud_new'] = False
+
+    quiz_bird = st.session_state['qaud_bird']
+    options = st.session_state['qaud_options']
+    answered = st.session_state['qaud_answered']
+    user_ans = st.session_state['qaud_user']
+    correct = quiz_bird['name']
+
+    st.caption(f"得分：{st.session_state['qaud_score']} / {st.session_state['qaud_total']}")
+    audio_path = get_local_audio_path(quiz_bird)
+    st.audio(audio_path)
+
+    if not answered:
+        selected = st.radio("你的答案：", options, index=None, key="qaud_radio")
+        if selected:
+            st.session_state['qaud_answered'] = True
+            st.session_state['qaud_user'] = selected
+            st.session_state['qaud_total'] += 1
+            if selected == correct:
+                st.session_state['qaud_score'] += 1
+            st.rerun()
+    else:
+        if user_ans == correct:
+            st.success(f"🎉 正确！这就是 **{correct}**（{quiz_bird.get('pinyin', '')}）")
         else:
-            if user_ans == correct:
-                st.success(f"🎉 回答正确！这就是 **{correct}**（{quiz_bird.get('pinyin', '')}）")
-            else:
-                st.error(f"❌ 回答错误！")
-                st.info(f"你的答案：**{user_ans}**　✅ 正确答案：**{correct}**（{quiz_bird.get('pinyin', '')}）")
-            
-            st.markdown("**📖 鸟种介绍：**")
+            st.error(f"❌ 错误！你的答案：**{user_ans}**　✅ 正确：**{correct}**")
+        with st.expander("📖 鸟种介绍", expanded=True):
             st.write(f"*{quiz_bird['scientific_name']}*　{quiz_bird.get('english_name', '')}")
             st.write(quiz_bird['description'])
             if quiz_bird.get('song'):
                 st.info(f"🎵 鸣声：{quiz_bird['song']}")
-            
-            if st.button("➡️ 下一题", key="qaud_next", use_container_width=True):
-                st.session_state['qaud_new'] = True
-                st.rerun()
-    
-    elif game == "❓ 知识问答":
-        st.markdown("### ❓ 知识问答")
-        st.caption("🌟 趣味冷知识 · 那些你可能不知道的鸟类秘密…")
-
-        # 趣味冷知识题库
-        TRIVIA_POOL = [
-            {
-                'q': '哪种鸟的名字里含有数字，但它的“珍珠”项链其实是一簇羽毛？',
-                'options': ['珠颈斑鸠', '白头鹎', '麻雀', '灰喜鹊'],
-                'a': 0,
-                'explain': '珠颈斑鸠颈部黑白相间的斑点看起来像一串珍珠，但这是羽毛不是真的会掉的珠子！繁殖季过后这些羽毛会褪色。'
-            },
-            {
-                'q': '白头鹎的“白头”是怎么来的？',
-                'options': ['羽毛天生白色', '年龄越大头越白', '白色枕羽随年龄增长', '会换季变白'],
-                'a': 2,
-                'explain': '白头鹎小时候头部是橄榄绿色的，随着年龄增长，白色枕羽越来越多，老年个体几乎整头都是白的。所以看到白头特别多的，说明是只老鸟了！'
-            },
-            {
-                'q': '哪种鸟头顶有一把可以“收起来”的羽冠，受惊时会像扇子一样展开？',
-                'options': ['戴胜', '八哥', '凤头麦鸡', '灰喜鹊'],
-                'a': 0,
-                'explain': '戴胜头顶的羽冠平时折叠贴在头上，受到惊扰时会竖起展开，像一把精致的小扇子，因此得名「戴胜」（胜是古代的一种头饰）。'
-            },
-            {
-                'q': '普通翠鸟的蓝色羽毛其实是什么颜色？',
-                'options': ['结构色（物理折射）', '黑色素', '食物色素', '水质影响'],
-                'a': 0,
-                'explain': '翠鸟羽毛的蓝绿色其实是「结构色」——羽毛表面微结构让光线折射出蓝色，跟色素没关系。所以死去的翠鸟标本褪色后会变成灰白色！'
-            },
-            {
-                'q': '哪种苏州常见的鸟腿部几乎是“透明”的，站立时看起来像踩着高跷？',
-                'options': ['白鹭', '夜鹭', '苍鹭', '池鹭'],
-                'a': 0,
-                'explain': '白鹭的腿部油黑，但脚部黄绿色，远看腿部就像透明的一样，配合修长的脖颈，整体就像踩着高跷的芭蕾舞者。'
-            },
-            {
-                'q': '哪种鸟能模仿汽车喇叭、手机铃声等非鸟类声音，掌握50种以上？',
-                'options': ['八哥', '乌鸫', '画眉', '鹦鹉'],
-                'a': 1,
-                'explain': '乌鸫被称为「鸟中口技大师」，能模仿电锯、婴儿哭声、汽车鸣笛、手机铃声等，不仅模仿得像，还能连续变换50多种声音！比八哥还厉害。'
-            },
-            {
-                'q': '哪种鸟飞行时会发出像直升机螺旋桨一样的“噗噗”声？',
-                'options': ['珠颈斑鸠', '家鸽', '山斑鸠', '灰斑鸠'],
-                'a': 0,
-                'explain': '珠颈斑鸠翅膀结构特殊，飞行时翅膀扇动频率产生独特的噗噗声，很远就能听到，是识别它的好方法。'
-            },
-            {
-                'q': '哪种鸟是目前唯一被确认具有自我意识的鸟类，能认出镜中的自己？',
-                'options': ['喜鹊', '乌鸦', '鹦鹉', '鸽子'],
-                'a': 0,
-                'explain': '科学实验证明喜鹊能在镜子中认出自己（会在自己身上找标记而不是攻击镜子里的对手），这是自我意识的标志，连猫狗都做不到！'
-            },
-            {
-                'q': '哪种鸟捕鱼时会先“脚搅水面”，利用鱼的趋光性？',
-                'options': ['池鹭', '苍鹭', '白鹭', '翠鸟'],
-                'a': 0,
-                'explain': '池鹭会用脚轻轻搅动水面，水面波光粼粼会吸引附近小鱼的注意，等鱼游过来看热闹时就一口捕获——简直是鸟类版的钓鱼！'
-            },
-            {
-                'q': '哪种鸟能一口气唱出20多种音调，持续数分钟不重复？',
-                'options': ['画眉', '乌鸫', '百灵', '白头鹎'],
-                'a': 0,
-                'explain': '画眉是鸟类中的「歌唱家」，一场演唱会可以连续唱20多种不同旋律，有时长达数分钟，而且每只画眉都有自己的「原创曲目」。'
-            },
-            {
-                'q': '哪种鸟在城市的路灯下守株待兔，等灯光吸引来的昆虫自投罗网？',
-                'options': ['夜鹭', '白鹭', '池鹭', '苍鹭'],
-                'a': 0,
-                'explain': '夜鹭是夜行性鸟类，白天不太活跃，但晚上会在路灯、霓虹灯下等候，灯光吸引来大量飞虫，夜鹭就坐享其成——典型的借力打力！'
-            },
-            {
-                'q': '哪种鸟记忆力惊人，会把食物藏在上千个不同地点，冬天还能记得80%以上？',
-                'options': ['沼泽山雀', '麻雀', '灰喜鹊', '乌鸦'],
-                'a': 0,
-                'explain': '沼泽山雀（远东山雀）会在秋天分散藏食物于数千个地点，到冬天有80%以上的食物能准确找回，是鸟类中的「记忆冠军」。'
-            },
-            {
-                'q': '哪种鸟的鸟巢入口开在侧面，而且巢穴有隧道式的“玄关”防蛇？',
-                'options': ['翠鸟', '戴胜', '啄木鸟', '八哥'],
-                'a': 0,
-                'explain': '翠鸟在土坡上挖洞筑巢，入口是一个狭窄的圆孔，后面还有一段水平隧道，既方便自己进出，又能防止蛇类直接钻进巢里。'
-            },
-            {
-                'q': '哪种鸟在中国是“留鸟”但在欧洲是“候鸟”？',
-                'options': ['灰纹鹟', '乌鸫', '白头鹎', '麻雀'],
-                'a': 0,
-                'explain': '灰纹鹟在苏州是冬候鸟，但在欧洲它们是留鸟——同一物种在不同地区有不同的迁徙策略，非常有趣。'
-            },
-            {
-                'q': '哪种鸟喜欢在荷花花心里筑巢，利用荷叶遮风挡雨？',
-                'options': ['黑水鸡', '白鹭', '池鹭', '小鸊鷉'],
-                'a': 0,
-                'explain': '黑水鸡会把巢建在荷叶上或芦苇丛中，荷叶的弧度刚好能遮挡雨水，是个天然的「雨伞」——不过大雨时还是会被淋成落汤鸡。'
-            },
-            {
-                'q': '哪种鸟是苏州人最熟悉的“邻居”，一年四季在院子里都能见到？',
-                'options': ['白头鹎', '麻雀', '珠颈斑鸠', '灰喜鹊'],
-                'a': 0,
-                'explain': '白头鹎被苏州人称为「白头翁」，性格活泼不怕人，常在庭院、公园的树冠层跳跃穿梭，是当之无愧的「苏州最亲民小鸟」。'
-            },
-            {
-                'q': '哪种鸟会在春季集群形成壮观的“鸟浪”，几十只同时飞过天际？',
-                'options': ['家燕', '白鹭', '麻雀', '灰喜鹊'],
-                'a': 2,
-                'explain': '麻雀在春季繁殖期后会形成大群，有时几十甚至上百只一起行动，飞过天空时像一道棕色的浪潮，非常壮观。'
-            },
-            {
-                'q': '哪种鸟可以倒退飞行，还能悬停空中？',
-                'options': ['雨燕', '家燕', '燕子', '楼燕'],
-                'a': 0,
-                'explain': '雨燕几乎一生都在空中度过，能倒退飞行、悬停、急转弯，落地反而有困难——有的雨燕甚至睡觉时也在飞！'
-            },
-            {
-                'q': '哪种鸟的鸟蛋颜色能反映出巢穴的健康状况，颜色越深蛋壳越厚？',
-                'options': ['乌鸫', '麻雀', '白头鹎', '八哥'],
-                'a': 0,
-                'explain': '乌鸫的蛋是淡蓝绿色，研究发现生活在污染较轻区域的乌鸫，蛋的颜色更深、蛋壳更厚——蛋的颜色竟然能当环境指标！'
-            },
-            {
-                'q': '哪种鸟的鸟巢用蜘蛛丝当“建筑胶水”，把苔藓、羽毛粘在一起？',
-                'options': ['长尾缝叶莺', '白头鹎', '麻雀', '画眉'],
-                'a': 0,
-                'explain': '长尾缝叶莺会把大叶子缝在一起筑巢，它用喙当针、蜘蛛丝当线，把叶子边缘缝成一个小杯子，再填入柔软的苔藓和羽毛。'
-            },
-            {
-                'q': '哪种鸟在城市里学会了“等红灯”，机动车停车时会到车底下找虫吃？',
-                'options': ['乌鸦', '珠颈斑鸠', '麻雀', '灰喜鹊'],
-                'a': 0,
-                'explain': '城市里的乌鸦非常聪明，会在红灯时飞到车底下找昆虫，绿灯前及时飞走——有些城市的乌鸦甚至学会了把坚果丢到马路上让车压碎。'
-            },
-            {
-                'q': '哪种鸟的雏鸟会“装死”，被捕食者触碰时直接四肢瘫软一动不动？',
-                'options': ['珠颈斑鸠', '山麻雀', '麻雀', '白头鹎'],
-                'a': 0,
-                'explain': '珠颈斑鸠的雏鸟在受到惊扰时会表演「装死」，全身瘫软、心跳减缓，捕食者以为它死了往往就不吃了——这是生存智慧！'
-            },
-            {
-                'q': '哪种苏州常见的鸟，冬季会在雪地上排成“一字阵”觅食？',
-                'options': ['麻雀', '白头鹎', '燕雀', '灰喜鹊'],
-                'a': 2,
-                'explain': '燕雀冬季在苏州比较常见，它们觅食时会排成一字长蛇阵，边走边翻找食物，队伍可以拉得很长，像一条棕色的传送带。'
-            },
-            {
-                'q': '哪种鸟的脚趾可以在水面上快速踩水，奔跑而不沉下去？',
-                'options': ['小鸊鷉', '黑水鸡', '白鹭', '池鹭'],
-                'a': 1,
-                'explain': '黑水鸡的脚趾特别宽大，脚趾间还有瓣膜状结构，能把体重分散到很大的面积上，所以能在荷叶、浮萍上轻盈地奔跑而不沉下去。'
-            },
-            {
-                'q': '哪种鸟有“森林医生”的称号，专门给树治病却从不收诊费？',
-                'options': ['啄木鸟', '戴胜', '八哥', '灰喜鹊'],
-                'a': 0,
-                'explain': '啄木鸟每天敲击树木上千次，能吃掉树皮里的害虫，洞还能给其他鸟做巢，是真正的「森林医生」，而且完全免费义诊！'
-            },
-        ]
-
-        # 题库缓存
-        if 'qkb_pool' not in st.session_state or st.session_state.get('qkb_pool_reset'):
-            st.session_state['qkb_pool'] = TRIVIA_POOL[:]
-            random.shuffle(st.session_state['qkb_pool'])
-            st.session_state['qkb_pool_reset'] = False
-
-        questions = st.session_state['qkb_pool']
-
-        if 'qkb_q' not in st.session_state or st.session_state.get('qkb_new'):
-            q = random.choice(questions)
-            st.session_state['qkb_q'] = q
-            st.session_state['qkb_answered'] = False
-            st.session_state['qkb_new'] = False
-
-        q = st.session_state['qkb_q']
-        st.markdown(f"**{q['q']}**")
-
-        cols = st.columns(2)
-        for i, opt in enumerate(q['options']):
-            with cols[i % 2]:
-                if st.button(f"  {opt}", key=f"qkb_opt_{i}", use_container_width=True):
-                    st.session_state['qkb_answered'] = True
-                    st.session_state['qkb_selected'] = i
-                    if i == q['a']:
-                        st.session_state['qkb_score'] = st.session_state.get('qkb_score', 0) + 1
-                        st.success("✅ 回答正确！")
-                    else:
-                        st.error(f"❌ 回答错误，正确答案是：{q['options'][q['a']]}")
-
-        if st.session_state.get('qkb_answered'):
-            st.markdown(f"> 💡 {q['explain']}")
-            if st.button("  下一题", key="qkb_next", use_container_width=True):
-                st.session_state['qkb_new'] = True
-                st.rerun()
-
-            total = st.session_state.get('qkb_score', 0)
-            st.info(f"🎯 本局得分：{total} / {len(TRIVIA_POOL)}")
-
-        if st.button("  重新开始", key="qkb_restart", use_container_width=True):
-            st.session_state['qkb_pool_reset'] = True
-            st.session_state['qkb_score'] = 0
-            st.session_state.pop('qkb_q', None)
-            st.session_state.pop('qkb_answered', None)
+        if st.button("➡️ 下一题", key="qaud_next", use_container_width=True):
+            st.session_state['qaud_new'] = True
             st.rerun()
+    if st.button("🔄 重新开始", key="qaud_restart", use_container_width=True):
+        for k in ['qaud_bird','qaud_options','qaud_answered','qaud_user','qaud_score','qaud_total','qaud_new']:
+            st.session_state.pop(k, None)
+        st.rerun()
 
-    elif game == "📦 推箱子·救小鸟":
-        _game_sokoban()
+
+def display_qkb_inline():
+    """知识问答 - 可在 expander 中内联调用"""
+    import random
+    st.markdown("**🌟 趣味冷知识 · 那些你可能不知道的鸟类秘密…**")
+
+    TRIVIA_POOL = [
+        {'q': '哪种鸟的名字里含有数字，但它的"珍珠"项链其实是一簇羽毛？', 'options': ['珠颈斑鸠', '白头鹎', '麻雀', '灰喜鹊'], 'a': 0,
+         'explain': '珠颈斑鸠颈部黑白相间的斑点看起来像一串珍珠，但这是羽毛不是真的会掉的珠子！繁殖季过后这些羽毛会褪色。'},
+        {'q': '白头鹎的"白头"是怎么来的？', 'options': ['羽毛天生白色', '年龄越大头越白', '白色枕羽随年龄增长', '会换季变白'], 'a': 2,
+         'explain': '白头鹎小时候头部是橄榄绿色的，随着年龄增长，白色枕羽越来越多，老年个体几乎整头都是白的。'},
+        {'q': '哪种鸟头顶有一把可以"收起来"的羽冠，受惊时会像扇子一样展开？', 'options': ['戴胜', '八哥', '凤头麦鸡', '灰喜鹊'], 'a': 0,
+         'explain': '戴胜头顶的羽冠平时折叠贴在头上，受到惊扰时会竖起展开，像一把精致的小扇子，因此得名「戴胜」。'},
+        {'q': '普通翠鸟的蓝色羽毛其实是什么颜色？', 'options': ['结构色（物理折射）', '黑色素', '食物色素', '水质影响'], 'a': 0,
+         'explain': '翠鸟羽毛的蓝绿色其实是「结构色」——羽毛表面微结构让光线折射出蓝色，跟色素没关系。死后的翠鸟标本会褪成灰白色。'},
+        {'q': '哪种苏州常见的鸟腿部几乎是"透明"的，站立时看起来像踩着高跷？', 'options': ['白鹭', '夜鹭', '苍鹭', '池鹭'], 'a': 0,
+         'explain': '白鹭的腿部油黑，但脚部黄绿色，远看腿部就像透明的一样，配合修长的脖颈，整体就像踩着高跷的芭蕾舞者。'},
+        {'q': '哪种鸟能模仿汽车喇叭、手机铃声等非鸟类声音，掌握50种以上？', 'options': ['八哥', '乌鸫', '画眉', '鹦鹉'], 'a': 1,
+         'explain': '乌鸫被称为「鸟中口技大师」，能模仿电锯、婴儿哭声、汽车鸣笛、手机铃声等，比八哥还厉害。'},
+        {'q': '哪种鸟飞行时会发出像直升机螺旋桨一样的"噗噗"声？', 'options': ['珠颈斑鸠', '家鸽', '山斑鸠', '灰斑鸠'], 'a': 0,
+         'explain': '珠颈斑鸠翅膀结构特殊，飞行时翅膀扇动频率产生独特的噗噗声，很远就能听到。'},
+        {'q': '哪种鸟是目前唯一被确认具有自我意识的鸟类，能认出镜中的自己？', 'options': ['喜鹊', '乌鸦', '鹦鹉', '鸽子'], 'a': 0,
+         'explain': '科学实验证明喜鹊能在镜子中认出自己（会在自己身上找标记而不是攻击镜子里的对手），连猫狗都做不到！'},
+        {'q': '哪种鸟捕鱼时会先"脚搅水面"，利用鱼的趋光性？', 'options': ['池鹭', '苍鹭', '白鹭', '翠鸟'], 'a': 0,
+         'explain': '池鹭会用脚轻轻搅动水面，水面波光粼粼会吸引附近小鱼的注意，等鱼游过来就一口捕获。'},
+        {'q': '哪种鸟记忆力惊人，会把食物藏在上千个不同地点，冬天还能记得80%以上？', 'options': ['沼泽山雀', '麻雀', '灰喜鹊', '乌鸦'], 'a': 0,
+         'explain': '沼泽山雀会在秋天分散藏食物于数千个地点，到冬天有80%以上能准确找回，是鸟类中的「记忆冠军」。'},
+        {'q': '哪种鸟的鸟巢入口开在侧面，而且巢穴有隧道式的"玄关"防蛇？', 'options': ['翠鸟', '戴胜', '啄木鸟', '八哥'], 'a': 0,
+         'explain': '翠鸟在土坡上挖洞筑巢，入口是一个狭窄的圆孔，后面还有一段水平隧道，既方便自己进出，又能防止蛇类直接钻进巢里。'},
+        {'q': '哪种鸟喜欢在荷花花心里筑巢，利用荷叶遮风挡雨？', 'options': ['黑水鸡', '白鹭', '池鹭', '小鸊鷉'], 'a': 0,
+         'explain': '黑水鸡会把巢建在荷叶上或芦苇丛中，荷叶的弧度刚好能遮挡雨水，是个天然的「雨伞」。'},
+        {'q': '哪种鸟是苏州人最熟悉的"邻居"，一年四季在院子里都能见到？', 'options': ['白头鹎', '麻雀', '珠颈斑鸠', '灰喜鹊'], 'a': 0,
+         'explain': '白头鹎被苏州人称为「白头翁」，性格活泼不怕人，是当之无愧的「苏州最亲民小鸟」。'},
+        {'q': '哪种鸟的脚趾可以在水面上快速踩水，奔跑而不沉下去？', 'options': ['小鸊鷉', '黑水鸡', '白鹭', '池鹭'], 'a': 1,
+         'explain': '黑水鸡的脚趾特别宽大，脚趾间还有瓣膜状结构，能把体重分散到很大的面积上，能在荷叶、浮萍上轻盈奔跑。'},
+        {'q': '哪种鸟有"森林医生"的称号，专门给树治病却从不收诊费？', 'options': ['啄木鸟', '戴胜', '八哥', '灰喜鹊'], 'a': 0,
+         'explain': '啄木鸟每天敲击树木上千次，能吃掉树皮里的害虫，洞还能给其他鸟做巢，是真正的「森林医生」。'},
+    ]
+
+    if 'qkb_pool' not in st.session_state or st.session_state.get('qkb_pool_reset'):
+        st.session_state['qkb_pool'] = TRIVIA_POOL[:]
+        random.shuffle(st.session_state['qkb_pool'])
+        st.session_state['qkb_pool_reset'] = False
+
+    questions = st.session_state['qkb_pool']
+    if 'qkb_q' not in st.session_state or st.session_state.get('qkb_new'):
+        q = random.choice(questions)
+        st.session_state['qkb_q'] = q
+        st.session_state['qkb_answered'] = False
+        st.session_state['qkb_new'] = False
+
+    q = st.session_state['qkb_q']
+    st.markdown(f"**{q['q']}**")
+
+    cols = st.columns(2)
+    for i, opt in enumerate(q['options']):
+        with cols[i % 2]:
+            if st.button(f"  {opt}", key=f"qkb_opt_{i}", use_container_width=True):
+                st.session_state['qkb_answered'] = True
+                st.session_state['qkb_selected'] = i
+                if i == q['a']:
+                    st.session_state['qkb_score'] = st.session_state.get('qkb_score', 0) + 1
+                    st.success("✅ 回答正确！")
+                else:
+                    st.error(f"❌ 回答错误，正确答案是：{q['options'][q['a']]}")
+
+    if st.session_state.get('qkb_answered'):
+        st.markdown(f"> 💡 {q['explain']}")
+        if st.button("  下一题", key="qkb_next", use_container_width=True):
+            st.session_state['qkb_new'] = True
+            st.rerun()
+        total = st.session_state.get('qkb_score', 0)
+        st.info(f"🎯 本局得分：{total} / {len(TRIVIA_POOL)}")
+
+    if st.button("  重新开始", key="qkb_restart", use_container_width=True):
+        st.session_state['qkb_pool_reset'] = True
+        st.session_state['qkb_score'] = 0
+        for k in ['qkb_q','qkb_answered','qkb_selected','qkb_new']:
+            st.session_state.pop(k, None)
+        st.rerun()
+
+
+def display_qbox_inline():
+    """推箱子 - 可在 expander 中内联调用"""
+    _game_sokoban()
 
 
 def main():
-    # 页面选择：手机端通过首页"开始"按钮跳转，电脑端用侧边栏
-    page = st.session_state.get('page') or st.sidebar.radio("页面导航", ["🏠 鸟类图谱", "🕹️ 趣味游戏"])
-    # 同步给侧边栏（保证后续 rerun 时一致）
-    st.session_state['page'] = page
-
+    # 不再使用单独的"游戏页面"，全部用 expander 在首页内联展示
+    # 但保留侧边栏以兼容外链或老链接（自动重定向到首页展开 expander）
+    page = st.sidebar.radio("页面导航", ["🏠 鸟类图谱", "🕹️ 趣味游戏"])
     if page == "🕹️ 趣味游戏":
-        display_games_page()
-    else:
-        # 鸟类图谱页面
-        import random
-        # 只从有图的鸟中选今日推荐
-        birds_with_img = [b for b in BIRDS_DATA if get_local_image_path(b)]
-        today_bird = random.choice(birds_with_img) if birds_with_img else random.choice(BIRDS_DATA)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown('<div class="feature-card">', unsafe_allow_html=True)
-            st.markdown("### 🌟 今日鸟种")
-            img_path = get_local_image_path(today_bird)
-            st.image(img_path, width=280)
-            st.markdown(f"**{today_bird['name']}**")
-            st.markdown(f"*{today_bird.get('pinyin', '')}*")
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown('<div class="feature-card">', unsafe_allow_html=True)
-            st.markdown("### 🎯 听音识鸟")
-            st.markdown("听音频，猜猜是哪只鸟？")
+        st.info("👇 游戏已迁移到首页底部的折叠卡片中，请回到『鸟类图谱』页面体验。")
+        return
 
-            # 只从有音频的鸟中选（保证一定可播放）
-            birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b) and b['id'] != today_bird['id']]
-            if not birds_with_audio:
-                birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b)]
-            quiz_bird = random.choice(birds_with_audio)
-            audio_path = get_local_audio_path(quiz_bird)
+    # 鸟类图谱页面
+    import random
+    # 只从有图的鸟中选今日推荐
+    birds_with_img = [b for b in BIRDS_DATA if get_local_image_path(b)]
+    today_bird = random.choice(birds_with_img) if birds_with_img else random.choice(BIRDS_DATA)
 
-            if audio_path:
-                st.audio(audio_path)
+    col1, col2 = st.columns(2)
 
-            with st.expander("🔑 答案"):
-                st.markdown(f"**{quiz_bird['name']}** - {quiz_bird.get('pinyin', '')}")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # 手机端友好的游戏入口：4 个大按钮卡片，电脑端 4 列 / 手机端自动堆叠
-        st.markdown("### 🎮 趣味游戏")
-        st.caption("边玩边学，认识更多苏州鸟类")
-        game_cards = [
-            ("🎨", "看图猜鸟", "根据图片猜鸟种", "qimg"),
-            ("🎵", "听音识鸟", "听声音认鸟种", "qaudio"),
-            ("❓", "知识问答", "趣味鸟类冷知识", "qkb"),
-            ("📦", "推箱子·救小鸟", "推箱子通关救鸟", "qbox"),
-        ]
-        # 电脑端 4 列
-        gc_cols = st.columns(4)
-        for i, (icon, title, desc, key) in enumerate(game_cards):
-            with gc_cols[i % 4]:
-                st.markdown(f"""
-                <div style="background:linear-gradient(135deg,#fff8e1,#ffe0b2);
-                            padding:16px;border-radius:12px;text-align:center;
-                            box-shadow:0 2px 6px rgba(0,0,0,0.08);
-                            margin-bottom:8px;min-height:90px;">
-                    <div style="font-size:2rem;">{icon}</div>
-                    <div style="font-weight:700;color:#5d4037;margin-top:4px;">{title}</div>
-                    <div style="font-size:0.78rem;color:#8d6e63;">{desc}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button(f"开始 · {title}", key=f"home_{key}", use_container_width=True):
-                    st.session_state['page'] = "🕹️ 趣味游戏"
-                    st.session_state['home_game'] = {
-                        "🎨 看图猜鸟": "qimg", "🎵 听音识鸟": "qaudio",
-                        "❓ 知识问答": "qkb", "📦 推箱子·救小鸟": "qbox"
-                    }[title]
-                    st.rerun()
-        
-        st.markdown('<div class="fact-card">', unsafe_allow_html=True)
-        st.markdown("### 📚 趣味知识")
-        facts = [
-            "🐦 白头鹎会根据地域形成不同的方言，不同地区的白头鹎叫声有差异",
-            "🦜 麻雀的寿命可达10年，比很多宠物都长寿",
-            "🦆 八哥可以模仿人类说话，经过训练能说简单的词语",
-            "🎵 乌鸫的歌声可达100种音调，是鸟类中的歌唱家",
-            "🐔 珠颈斑鸠的叫声像咕咕咕，常被误认为是杜鹃",
-            "🌿 鸟类的羽毛结构非常精密，帮助它们高效飞翔",
-        ]
-        fact = random.choice(facts)
-        st.markdown(f"> {fact}")
+    with col1:
+        st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+        st.markdown("### 🌟 今日鸟种")
+        img_path = get_local_image_path(today_bird)
+        st.image(img_path, width=280)
+        st.markdown(f"**{today_bird['name']}**")
+        st.markdown(f"*{today_bird.get('pinyin', '')}*")
         st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        if 'selected_bird' in st.session_state and st.session_state['selected_bird']:
-            display_detail_page(st.session_state['selected_bird'])
-        else:
-            display_card_list()
+
+    with col2:
+        st.markdown('<div class="feature-card">', unsafe_allow_html=True)
+        st.markdown("### 🎯 听音识鸟")
+        st.markdown("听音频，猜猜是哪只鸟？")
+
+        # 只从有音频的鸟中选（保证一定可播放）
+        birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b) and b['id'] != today_bird['id']]
+        if not birds_with_audio:
+            birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b)]
+        quiz_bird = random.choice(birds_with_audio)
+        audio_path = get_local_audio_path(quiz_bird)
+
+        if audio_path:
+            st.audio(audio_path)
+
+        with st.expander("🔑 答案"):
+            st.markdown(f"**{quiz_bird['name']}** - {quiz_bird.get('pinyin', '')}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 4 个游戏全部用 expander 折叠（无需跳转页面，手机电脑一致）
+    st.markdown("### 🎮 趣味游戏")
+    st.caption("点击展开 · 边玩边学")
+
+    with st.expander("🎨 看图猜鸟", expanded=False):
+        display_qimg_inline()
+    with st.expander("🎵 听音识鸟", expanded=False):
+        display_qaudio_inline()
+    with st.expander("❓ 知识问答", expanded=False):
+        display_qkb_inline()
+    with st.expander("📦 推箱子·救小鸟", expanded=False):
+        display_qbox_inline()
+
+    st.markdown('<div class="fact-card">', unsafe_allow_html=True)
+    st.markdown("### 📚 趣味知识")
+    facts = [
+        "🐦 白头鹎会根据地域形成不同的方言，不同地区的白头鹎叫声有差异",
+        "🦜 麻雀的寿命可达10年，比很多宠物都长寿",
+        "🦆 八哥可以模仿人类说话，经过训练能说简单的词语",
+        "🎵 乌鸫的歌声可达100种音调，是鸟类中的歌唱家",
+        "🐔 珠颈斑鸠的叫声像咕咕咕，常被误认为是杜鹃",
+        "🌿 鸟类的羽毛结构非常精密，帮助它们高效飞翔",
+    ]
+    fact = random.choice(facts)
+    st.markdown(f"> {fact}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    if 'selected_bird' in st.session_state and st.session_state['selected_bird']:
+        display_detail_page(st.session_state['selected_bird'])
+    else:
+        display_card_list()
 
 
 main()
