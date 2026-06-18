@@ -1,0 +1,52 @@
+# 验证/调试脚本
+_verify*.py
+result.txt
+o.txt
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 下载/处理工具（可选保留）
+batch_trim_audio.py
+convert_mp4_to_mp3.py
+download_audio*.py
+download_images.py
+download_wiki_images.py
+trim_audio.py
+test_download.py
+
+# 环境/IDE
+.env
+.venv/
+venv/
+.idea/
+.vscode/
+*.egg-info/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Streamlit
+.streamlit/
+
+# Misc
+.DS_Store
+*.log
