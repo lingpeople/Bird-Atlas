@@ -1069,28 +1069,36 @@ def main():
             st.markdown(f"**{quiz_bird['name']}** - {quiz_bird.get('pinyin', '')}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 手机端在 sidebar 折叠按钮（«）旁加"🎮游戏"提示，电脑端不显示
+    # 手机端固定浮动提示：sidebar 折叠前就在屏幕左上角显示"游戏"入口
     st.markdown("""
     <style>
+    .mobile-game-hint {
+        display: none;
+    }
     @media (max-width: 768px) {
-        [data-testid="baseButton-headerNoSidebar"]::after,
-        [data-testid="stSidebarCollapseButton"]::after,
-        [data-testid="stSidebarNav"] button::after,
-        header [data-testid="baseButton-header"]::after,
-        button[aria-label*="sidebar" i]::after,
-        button[aria-label*="navigation" i]::after {
-            content: " 🎮 游戏";
-            font-size: 14px;
-            font-weight: 700;
+        .mobile-game-hint {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            position: fixed;
+            top: 14px;
+            left: 68px;
+            z-index: 9999;
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
             color: #5d4037;
-            margin-left: 4px;
-            background: #fff3e0;
-            padding: 4px 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 6px 12px;
+            border-radius: 18px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+            pointer-events: none;
         }
     }
     </style>
+    <div class="mobile-game-hint">
+        <span style="font-size:1.15rem;">🎮</span>
+        <span>点 <span style="color:#ff6f00;font-size:1.1rem;">«</span> 进游戏</span>
+    </div>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="fact-card">', unsafe_allow_html=True)
