@@ -249,47 +249,91 @@ def display_card_list():
     
     st.markdown(f"**共 {len(filtered_birds)} 种鸟类**")
     st.markdown("---")
-    
-    # 两列布局
-    cols = st.columns(2)
-    
+
+    # 响应式布局：电脑端用两列，手机端自动堆叠为单列
+    # 通过判断屏幕宽度在 CSS 中隐藏/显示列；这里用单一容器 + 卡片流式排版，确保窄屏顺序为 1,2,3...
+    use_two_cols = True
+    try:
+        # Streamlit 没有直接获取客户端宽度的接口，但可以用 JS 注入检测后存到 session_state
+        # 简化方案：使用 CSS 让两列在窄屏自动堆叠为单列，保证渲染顺序
+        st.markdown("""
+        <style>
+        @media (max-width: 768px) {
+            .bird-card-row { flex-direction: column !important; }
+            .bird-card-row > div { width: 100% !important; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    except Exception:
+        pass
+
+    # 使用 1 列垂直流式排版，避免 i%2 在窄屏下出现 1,3,5,7,9 跳序
+    # 电脑端用 CSS 模拟两列
+    cards_html_parts = []
     for i, bird in enumerate(filtered_birds):
-        with cols[i % 2]:
-            img_path = get_local_image_path(bird)
-            
-            with st.container():
-                st.markdown('<div class="bird-card">', unsafe_allow_html=True)
-                
-                # 左侧文字信息 + 右侧图片
-                col_left, col_right = st.columns([1.5, 1])
-                
-                with col_left:
-                    # 名称 - 拼音在上，名字在下
-                    st.markdown(f"<span class='pinyin'>{bird.get('pinyin', '')}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<span class='bird-name'>{bird['id']}. {bird['name']}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<span class='scientific-name'>{bird['scientific_name']}</span>", unsafe_allow_html=True)
-                    
-                    # 标签
-                    st.markdown(f"<span class='info-tag'>{bird['category']}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<span class='info-tag'>{bird['season']}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<span class='info-tag'>{bird['conservation_level']}</span>", unsafe_allow_html=True)
-                    
-                    # 常见程度星级
-                    st.markdown(f"<span style='color:#FFB300;font-size:1.1rem'>{bird.get('common_level', '')}</span>", unsafe_allow_html=True)
-                    
-                    # 点击按钮
-                    if st.button(f"查看详情", key=f"btn_{bird['id']}"):
-                        st.session_state['selected_bird'] = bird
-                        st.rerun()
-                
-                with col_right:
-                    if img_path:
-                        st.image(img_path, use_container_width=True)
-                    else:
-                        st.markdown('<div class="placeholder-img">🐦</div>', unsafe_allow_html=True)
-                
-                st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown("")
+        img_path = get_local_image_path(bird)
+        img_html = ""
+        if img_path:
+            # 使用 file:// 绝对路径
+            img_html = f'<img src="file:///{img_path.replace(chr(92), "/")}" style="width:100%;border-radius:8px;" />'
+        else:
+            img_html = '<div class="placeholder-img" style="font-size:3rem;text-align:center;">🐦</div>'
+
+        card_html = f"""
+        <div class="bird-card" style="margin-bottom:14px;padding:14px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <div class="bird-card-row" style="display:flex;gap:12px;align-items:flex-start;">
+                <div style="flex:1.5;min-width:0;">
+                    <div style="color:#888;font-size:0.85rem;">{bird.get('pinyin', '')}</div>
+                    <div style="font-size:1.15rem;font-weight:700;color:#222;">{bird['id']}. {bird['name']}</div>
+                    <div style="font-style:italic;color:#666;font-size:0.85rem;">{bird['scientific_name']}</div>
+                    <div style="margin-top:6px;">
+                        <span class="info-tag" style="background:#f0f4f8;padding:2px 8px;border-radius:10px;font-size:0.78rem;color:#456;margin-right:4px;">{bird['category']}</span>
+                        <span class="info-tag" style="background:#f0f4f8;padding:2px 8px;border-radius:10px;font-size:0.78rem;color:#456;margin-right:4px;">{bird['season']}</span>
+                        <span class="info-tag" style="background:#f0f4f8;padding:2px 8px;border-radius:10px;font-size:0.78rem;color:#456;">{bird['conservation_level']}</span>
+                    </div>
+                    <div style="color:#FFB300;font-size:1rem;margin-top:4px;">{bird.get('common_level', '')}</div>
+                </div>
+                <div style="flex:1;min-width:0;">{img_html}</div>
+            </div>
+        </div>
+        """
+        cards_html_parts.append(card_html)
+
+    # 电脑端两列布局
+    pc_html = ""
+    for i in range(0, len(cards_html_parts), 2):
+        left = cards_html_parts[i]
+        right = cards_html_parts[i+1] if i+1 < len(cards_html_parts) else '<div></div>'
+        pc_html += f"""
+        <div style="display:flex;gap:14px;margin-bottom:14px;">
+            <div style="flex:1;min-width:0;">{left}</div>
+            <div style="flex:1;min-width:0;">{right}</div>
+        </div>
+        """
+
+    # 注入响应式 CSS
+    st.markdown(f"""
+    <style>
+    .bird-grid-pc {{ display: block; }}
+    .bird-grid-mobile {{ display: none; }}
+    @media (max-width: 768px) {{
+        .bird-grid-pc {{ display: none; }}
+        .bird-grid-mobile {{ display: block; }}
+    }}
+    </style>
+    <div class="bird-grid-pc">{pc_html}</div>
+    <div class="bird-grid-mobile">{''.join(cards_html_parts)}</div>
+    """, unsafe_allow_html=True)
+
+    # 详情按钮（必须用 streamlit widget，放在卡片下方）
+    # 电脑端 2 列，手机端 1 列
+    if use_two_cols:
+        for i, bird in enumerate(filtered_birds):
+            cols_btn = st.columns(2)
+            with cols_btn[i % 2]:
+                if st.button(f"查看详情 · {bird['id']}. {bird['name']}", key=f"btn_{bird['id']}", use_container_width=True):
+                    st.session_state['selected_bird'] = bird
+                    st.rerun()
 
 
 def display_detail_page(bird):
@@ -722,16 +766,52 @@ def _game_sokoban():
 def display_games_page():
     """游戏页面"""
     import random
-    
+
     st.markdown("## 🕹️ 趣味游戏")
     st.caption("在游戏中认识鸟类 · 边玩边学")
-    
-    game = st.selectbox("选择游戏", [
-        "🎨 看图猜鸟",
-        "🎵 听音识鸟",
-        "❓ 知识问答",
-        "📦 推箱子·救小鸟"
-    ])
+
+    # 手机端友好的游戏选择：4 个大按钮卡片（电脑端 4 列 / 手机端 2x2）
+    if 'home_game' in st.session_state and st.session_state['home_game']:
+        # 从首页点进来时直接锁定游戏
+        game_key_map = {
+            "qimg": "🎨 看图猜鸟",
+            "qaudio": "🎵 听音识鸟",
+            "qkb": "❓ 知识问答",
+            "qbox": "📦 推箱子·救小鸟",
+        }
+        game = game_key_map.get(st.session_state['home_game'], "🎨 看图猜鸟")
+        st.session_state.pop('home_game', None)
+        st.session_state['sk_current_game'] = game
+    elif 'sk_current_game' not in st.session_state:
+        st.session_state['sk_current_game'] = "🎨 看图猜鸟"
+
+    game = st.session_state['sk_current_game']
+
+    # 顶部游戏切换按钮（4 列，电脑端横排 / 手机端 2x2）
+    games_list = [
+        ("🎨", "看图猜鸟", "qimg"),
+        ("🎵", "听音识鸟", "qaudio"),
+        ("❓", "知识问答", "qkb"),
+        ("📦", "推箱子·救小鸟", "qbox"),
+    ]
+    nav_cols = st.columns(4)
+    for i, (icon, name, key) in enumerate(games_list):
+        with nav_cols[i % 4]:
+            is_active = (game == f"{icon} {name}")
+            bg = "linear-gradient(135deg,#ffb74d,#ff9800)" if is_active else "linear-gradient(135deg,#f5f5f5,#e0e0e0)"
+            color = "#fff" if is_active else "#5d4037"
+            st.markdown(f"""
+            <div style="background:{bg};padding:12px 6px;border-radius:10px;text-align:center;
+                        box-shadow:0 2px 6px rgba(0,0,0,0.08);margin-bottom:6px;color:{color};
+                        font-weight:600;min-height:50px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:1.4rem;margin-right:4px;">{icon}</span>{name}
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"切换到{name}", key=f"nav_{key}", use_container_width=True):
+                st.session_state['sk_current_game'] = f"{icon} {name}"
+                st.rerun()
+
+    st.markdown("---")
     
     if game == "🎨 看图猜鸟":
         st.markdown("### 🎨 看图猜鸟")
@@ -1061,9 +1141,11 @@ def display_games_page():
 
 
 def main():
-    # 页面选择
-    page = st.sidebar.radio("页面导航", ["🏠 鸟类图谱", "🕹️ 趣味游戏"])
-    
+    # 页面选择：手机端通过首页"开始"按钮跳转，电脑端用侧边栏
+    page = st.session_state.get('page') or st.sidebar.radio("页面导航", ["🏠 鸟类图谱", "🕹️ 趣味游戏"])
+    # 同步给侧边栏（保证后续 rerun 时一致）
+    st.session_state['page'] = page
+
     if page == "🕹️ 趣味游戏":
         display_games_page()
     else:
@@ -1088,20 +1170,51 @@ def main():
             st.markdown('<div class="feature-card">', unsafe_allow_html=True)
             st.markdown("### 🎯 听音识鸟")
             st.markdown("听音频，猜猜是哪只鸟？")
-            
+
             # 只从有音频的鸟中选（保证一定可播放）
             birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b) and b['id'] != today_bird['id']]
             if not birds_with_audio:
                 birds_with_audio = [b for b in BIRDS_DATA if get_local_audio_path(b)]
             quiz_bird = random.choice(birds_with_audio)
             audio_path = get_local_audio_path(quiz_bird)
-            
+
             if audio_path:
                 st.audio(audio_path)
-            
+
             with st.expander("🔑 答案"):
                 st.markdown(f"**{quiz_bird['name']}** - {quiz_bird.get('pinyin', '')}")
             st.markdown('</div>', unsafe_allow_html=True)
+
+        # 手机端友好的游戏入口：4 个大按钮卡片，电脑端 4 列 / 手机端自动堆叠
+        st.markdown("### 🎮 趣味游戏")
+        st.caption("边玩边学，认识更多苏州鸟类")
+        game_cards = [
+            ("🎨", "看图猜鸟", "根据图片猜鸟种", "qimg"),
+            ("🎵", "听音识鸟", "听声音认鸟种", "qaudio"),
+            ("❓", "知识问答", "趣味鸟类冷知识", "qkb"),
+            ("📦", "推箱子·救小鸟", "推箱子通关救鸟", "qbox"),
+        ]
+        # 电脑端 4 列
+        gc_cols = st.columns(4)
+        for i, (icon, title, desc, key) in enumerate(game_cards):
+            with gc_cols[i % 4]:
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,#fff8e1,#ffe0b2);
+                            padding:16px;border-radius:12px;text-align:center;
+                            box-shadow:0 2px 6px rgba(0,0,0,0.08);
+                            margin-bottom:8px;min-height:90px;">
+                    <div style="font-size:2rem;">{icon}</div>
+                    <div style="font-weight:700;color:#5d4037;margin-top:4px;">{title}</div>
+                    <div style="font-size:0.78rem;color:#8d6e63;">{desc}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"开始 · {title}", key=f"home_{key}", use_container_width=True):
+                    st.session_state['page'] = "🕹️ 趣味游戏"
+                    st.session_state['home_game'] = {
+                        "🎨 看图猜鸟": "qimg", "🎵 听音识鸟": "qaudio",
+                        "❓ 知识问答": "qkb", "📦 推箱子·救小鸟": "qbox"
+                    }[title]
+                    st.rerun()
         
         st.markdown('<div class="fact-card">', unsafe_allow_html=True)
         st.markdown("### 📚 趣味知识")
