@@ -526,6 +526,21 @@ def _game_sokoban():
     font-size: 18px;
     min-height: 24px;
   }}
+  /* 响应式：窄屏（手机）自动缩小 */
+  @media (max-width: 420px) {{
+    body {{ padding: 4px; }}
+    #sk-info {{ font-size: 13px; }}
+    #sk-grid {{ gap: 2px; padding: 3px; }}
+    .sk-cell {{ width: 34px; height: 34px; font-size: 20px; border-radius: 4px; }}
+    #sk-controls {{
+      grid-template-columns: 48px 48px 48px;
+      grid-template-rows: 48px 48px;
+      gap: 4px;
+      margin: 10px auto 0;
+    }}
+    .sk-btn {{ font-size: 22px; border-radius: 6px; }}
+    #sk-msg {{ font-size: 15px; margin-top: 8px; }}
+  }}
 </style>
 </head>
 <body>
@@ -734,20 +749,43 @@ def _render_bird_card(bird):
 
 
 def display_games_page():
-    """游戏页面（已废弃，保留以防兼容 - 现统一在首页用 expander 展示）"""
+    """游戏页面 - 独立页面，电脑端 + 手机端均可用（左上角 « 进入）"""
     import random
 
     st.markdown("## 🕹️ 趣味游戏")
     st.caption("在游戏中认识鸟类 · 边玩边学")
-    st.warning("游戏已迁移到首页底部 · 折叠式展示")
 
-    # 兼容老逻辑：仍支持页面内游戏选择
-    game = st.selectbox("选择游戏", [
-        "🎨 看图猜鸟",
-        "🎵 听音识鸟",
-        "❓ 知识问答",
-        "📦 推箱子·救小鸟"
-    ])
+    # 顶部游戏切换（4 列，电脑端横排 / 手机端 2x2）
+    games_list = [
+        ("🎨", "看图猜鸟", "qimg"),
+        ("🎵", "听音识鸟", "qaudio"),
+        ("❓", "知识问答", "qkb"),
+        ("📦", "推箱子·救小鸟", "qbox"),
+    ]
+    if 'sk_current_game' not in st.session_state:
+        st.session_state['sk_current_game'] = "🎨 看图猜鸟"
+    game = st.session_state['sk_current_game']
+
+    nav_cols = st.columns(4)
+    for i, (icon, name, key) in enumerate(games_list):
+        with nav_cols[i % 4]:
+            is_active = (game == f"{icon} {name}")
+            bg = "linear-gradient(135deg,#ffb74d,#ff9800)" if is_active else "linear-gradient(135deg,#f5f5f5,#e0e0e0)"
+            color = "#fff" if is_active else "#5d4037"
+            st.markdown(f"""
+            <div style="background:{bg};padding:12px 6px;border-radius:10px;text-align:center;
+                        box-shadow:0 2px 6px rgba(0,0,0,0.08);margin-bottom:6px;color:{color};
+                        font-weight:600;min-height:50px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:1.4rem;margin-right:4px;">{icon}</span>{name}
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"切换到{name}", key=f"nav_{key}", use_container_width=True):
+                st.session_state['sk_current_game'] = f"{icon} {name}"
+                st.rerun()
+
+    st.markdown("---")
+
+    # 路由到对应游戏
     if game == "🎨 看图猜鸟":
         display_qimg_inline()
     elif game == "🎵 听音识鸟":
@@ -966,11 +1004,11 @@ def display_qbox_inline():
 
 
 def main():
-    # 不再使用单独的"游戏页面"，全部用 expander 在首页内联展示
-    # 但保留侧边栏以兼容外链或老链接（自动重定向到首页展开 expander）
+    # 页面选择：侧边栏（手机端点左上角 « 展开）
     page = st.sidebar.radio("页面导航", ["🏠 鸟类图谱", "🕹️ 趣味游戏"])
+
     if page == "🕹️ 趣味游戏":
-        st.info("👇 游戏已迁移到首页底部的折叠卡片中，请回到『鸟类图谱』页面体验。")
+        display_games_page()
         return
 
     # 鸟类图谱页面
@@ -1009,18 +1047,21 @@ def main():
             st.markdown(f"**{quiz_bird['name']}** - {quiz_bird.get('pinyin', '')}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4 个游戏全部用 expander 折叠（无需跳转页面，手机电脑一致）
-    st.markdown("### 🎮 趣味游戏")
-    st.caption("点击展开 · 边玩边学")
-
-    with st.expander("🎨 看图猜鸟", expanded=False):
-        display_qimg_inline()
-    with st.expander("🎵 听音识鸟", expanded=False):
-        display_qaudio_inline()
-    with st.expander("❓ 知识问答", expanded=False):
-        display_qkb_inline()
-    with st.expander("📦 推箱子·救小鸟", expanded=False):
-        display_qbox_inline()
+    # 醒目游戏入口卡（提示手机端用户点左上角 « 进入游戏）
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);
+                padding:16px 20px;border-radius:14px;margin:18px 0;
+                box-shadow:0 4px 12px rgba(255,152,0,0.18);
+                display:flex;align-items:center;gap:14px;">
+        <div style="font-size:2.4rem;">🎮</div>
+        <div style="flex:1;">
+            <div style="font-weight:700;color:#5d4037;font-size:1.1rem;">趣味游戏在这里！</div>
+            <div style="font-size:0.85rem;color:#8d6e63;margin-top:2px;">
+                 手机端：点左上角 <span style="font-size:1.2rem;font-weight:700;color:#5d4037;">«</span> 展开菜单
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown('<div class="fact-card">', unsafe_allow_html=True)
     st.markdown("### 📚 趣味知识")
