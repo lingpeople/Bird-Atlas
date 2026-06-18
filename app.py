@@ -439,6 +439,9 @@ def _game_sokoban():
     total_boxes = sum(row.count('$') + row.count('*') for row in level_map)
     max_cols = max(len(r) for r in level_map)
     rows = len(level_map)
+    # CSS 网格模板需要的列数和行数
+    map_cols = max_cols
+    map_rows = rows
 
     # 动态计算 iframe 高度
     iframe_height = 240 + rows * 60 + 120  # 信息条 + 网格 + 控件 + 提示消息
@@ -487,17 +490,30 @@ def _game_sokoban():
     width: 56px;
     height: 56px;
     display: flex;
-    align-items: center;
+    align-items: flex;
     justify-content: center;
     font-size: 32px;
-    border-radius: 6px;
     user-select: none;
+    /* 关键：去掉圆角让格子连成整体 */
+    border-radius: 0;
+  }}
+  #sk-grid {{
+    display: grid;
+    grid-template-columns: repeat({map_cols}, 56px);
+    grid-template-rows: repeat({map_rows}, 56px);
+    gap: 1px;
+    background: #4e342e;            /* 缝隙颜色 = 墙体深色，让地图连成一片 */
+    padding: 3px;
+    border-radius: 10px;
+    width: fit-content;
+    margin: 12px auto 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   }}
   .sk-wall {{ background: #6d4c41; }}
   .sk-floor {{ background: #f1f8e9; }}
   .sk-target {{ background: #fff59d; }}
   .sk-box {{ background: #ffab91; }}
-  .sk-box-on {{ background: #a5d6a7; }}
+  .sk-box-on {{ background: #66bb6a; }}      /* 箱子在目标上时用深绿，对比更强 */
   .sk-player {{ background: #ffcc80; }}
   #sk-controls {{
     display: grid;
@@ -526,12 +542,18 @@ def _game_sokoban():
     font-size: 18px;
     min-height: 24px;
   }}
-  /* 响应式：窄屏（手机）自动缩小 */
+  /* 响应式：窄屏（手机）自动缩小 - 保持 1px 缝隙让地图连贯 */
   @media (max-width: 420px) {{
     body {{ padding: 4px; }}
     #sk-info {{ font-size: 13px; }}
-    #sk-grid {{ gap: 2px; padding: 3px; }}
-    .sk-cell {{ width: 34px; height: 34px; font-size: 20px; border-radius: 4px; }}
+    #sk-grid {{
+      grid-template-columns: repeat({map_cols}, 30px);
+      grid-template-rows: repeat({map_rows}, 30px);
+      gap: 1px;
+      padding: 2px;
+      border-radius: 6px;
+    }}
+    .sk-cell {{ width: 30px; height: 30px; font-size: 18px; }}
     #sk-controls {{
       grid-template-columns: 48px 48px 48px;
       grid-template-rows: 48px 48px;
@@ -1047,20 +1069,28 @@ def main():
             st.markdown(f"**{quiz_bird['name']}** - {quiz_bird.get('pinyin', '')}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 醒目游戏入口卡（提示手机端用户点左上角 « 进入游戏）
+    # 手机端在 sidebar 折叠按钮（«）旁加"🎮游戏"提示，电脑端不显示
     st.markdown("""
-    <div style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);
-                padding:16px 20px;border-radius:14px;margin:18px 0;
-                box-shadow:0 4px 12px rgba(255,152,0,0.18);
-                display:flex;align-items:center;gap:14px;">
-        <div style="font-size:2.4rem;">🎮</div>
-        <div style="flex:1;">
-            <div style="font-weight:700;color:#5d4037;font-size:1.1rem;">趣味游戏在这里！</div>
-            <div style="font-size:0.85rem;color:#8d6e63;margin-top:2px;">
-                 手机端：点左上角 <span style="font-size:1.2rem;font-weight:700;color:#5d4037;">«</span> 展开菜单
-            </div>
-        </div>
-    </div>
+    <style>
+    @media (max-width: 768px) {
+        [data-testid="baseButton-headerNoSidebar"]::after,
+        [data-testid="stSidebarCollapseButton"]::after,
+        [data-testid="stSidebarNav"] button::after,
+        header [data-testid="baseButton-header"]::after,
+        button[aria-label*="sidebar" i]::after,
+        button[aria-label*="navigation" i]::after {
+            content: " 🎮 游戏";
+            font-size: 14px;
+            font-weight: 700;
+            color: #5d4037;
+            margin-left: 4px;
+            background: #fff3e0;
+            padding: 4px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    }
+    </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="fact-card">', unsafe_allow_html=True)
