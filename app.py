@@ -250,77 +250,35 @@ def display_card_list():
     st.markdown(f"**共 {len(filtered_birds)} 种鸟类**")
     st.markdown("---")
 
-    # 电脑端 2 列网格，手机端 1 列（CSS grid 避免 div 嵌套错乱）
+    # 响应式布局：电脑端 2 列（用 st.columns），手机端用 CSS 让 columns 堆叠为 1 列
+    # 保证渲染顺序永远是 1,2,3,4,5...（不会出现 1,3,5,7,9）
     st.markdown("""
     <style>
-    .bird-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-        margin-bottom: 14px;
-    }
-    .bird-card {
-        background: #fff;
-        border-radius: 12px;
-        padding: 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        display: flex;
-        gap: 12px;
-        align-items: flex-start;
-    }
-    .bird-card-info { flex: 1.5; min-width: 0; }
-    .bird-card-img  { flex: 1; min-width: 0; }
-    .bird-card-info .pinyin { color: #888; font-size: 0.85rem; }
-    .bird-card-info .name { font-size: 1.15rem; font-weight: 700; color: #222; }
-    .bird-card-info .sci { font-style: italic; color: #666; font-size: 0.85rem; }
-    .bird-card-info .tags { margin-top: 6px; }
-    .bird-card-info .tag {
-        background: #f0f4f8; padding: 2px 8px; border-radius: 10px;
-        font-size: 0.78rem; color: #456; margin-right: 4px; display: inline-block;
-    }
-    .bird-card-info .star { color: #FFB300; font-size: 1rem; margin-top: 4px; }
-    .bird-card-img img { width: 100%; border-radius: 8px; }
-    .bird-card-img .ph { font-size: 3rem; text-align: center; }
     @media (max-width: 768px) {
-        .bird-grid { grid-template-columns: 1fr; }
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            flex: 0 0 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            width: 100% !important;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # 构造所有卡片 HTML
-    cards_html = []
-    for bird in filtered_birds:
-        img_path = get_local_image_path(bird)
-        if img_path:
-            img_html = f'<img src="file:///{img_path.replace(chr(92), "/")}" />'
-        else:
-            img_html = '<div class="ph">🐦</div>'
-        cards_html.append(f"""
-        <div class="bird-card">
-            <div class="bird-card-info">
-                <div class="pinyin">{bird.get('pinyin', '')}</div>
-                <div class="name">{bird['id']}. {bird['name']}</div>
-                <div class="sci">{bird['scientific_name']}</div>
-                <div class="tags">
-                    <span class="tag">{bird['category']}</span>
-                    <span class="tag">{bird['season']}</span>
-                    <span class="tag">{bird['conservation_level']}</span>
-                </div>
-                <div class="star">{bird.get('common_level', '')}</div>
-            </div>
-            <div class="bird-card-img">{img_html}</div>
-        </div>
-        """)
-
-    st.markdown(f'<div class="bird-grid">{"".join(cards_html)}</div>', unsafe_allow_html=True)
-
-    # 详情按钮（电脑端 2 列 / 手机端 1 列）
-    detail_cols = st.columns(2)
-    for i, bird in enumerate(filtered_birds):
-        with detail_cols[i % 2]:
-            if st.button(f"查看详情 · {bird['id']}. {bird['name']}", key=f"btn_{bird['id']}", use_container_width=True):
-                st.session_state['selected_bird'] = bird
-                st.rerun()
+    # 把所有鸟按 2 个一组划分（电脑端 2 列，手机端 CSS 堆叠为 1 列）
+    # 关键：每只鸟的内部使用 st.columns(2) 排文字和图片 → 窄屏时被 CSS 强制堆叠
+    for i in range(0, len(filtered_birds), 2):
+        left_bird = filtered_birds[i]
+        right_bird = filtered_birds[i + 1] if i + 1 < len(filtered_birds) else None
+        cols = st.columns(2)
+        for col, bird in zip(cols, [left_bird, right_bird]):
+            if bird is None:
+                continue
+            with col:
+                _render_bird_card(bird)
 
 
 def display_detail_page(bird):
@@ -748,6 +706,31 @@ def _game_sokoban():
                     st.rerun()
 
     st.caption(f"💡 把 {total_boxes} 个 📦 全部推到 🪺 上即过关 · 鼠标点击按钮或键盘方向键均可控制")
+
+
+def _render_bird_card(bird):
+    """渲染单只鸟的卡片（streamlit 原生组件，无 HTML）"""
+    with st.container(border=True):
+        col_text, col_img = st.columns([1.5, 1])
+        with col_text:
+            st.caption(bird.get('pinyin', ''))
+            st.markdown(f"**{bird['id']}. {bird['name']}**")
+            st.caption(bird['scientific_name'])
+            # 标签
+            tag_html = (
+                f"`{bird['category']}` `{bird['season']}` `{bird['conservation_level']}`"
+            )
+            st.markdown(tag_html)
+            st.markdown(f"<span style='color:#FFB300'>{bird.get('common_level', '')}</span>", unsafe_allow_html=True)
+        with col_img:
+            img_path = get_local_image_path(bird)
+            if img_path:
+                st.image(img_path, use_container_width=True)
+            else:
+                st.markdown("<div style='text-align:center;font-size:3rem'>🐦</div>", unsafe_allow_html=True)
+        if st.button(f"查看详情 · {bird['name']}", key=f"btn_{bird['id']}", use_container_width=True):
+            st.session_state['selected_bird'] = bird
+            st.rerun()
 
 
 def display_games_page():
